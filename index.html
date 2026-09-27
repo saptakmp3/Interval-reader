@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interval Sight-Reader</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14171b">
+<meta name="description" content="Recognize melodic and harmonic intervals on the staff — treble, bass, and mixed clef sight-reading practice.">
+
+<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Intervals">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --ink:#1c1a17; --paper:#f3ecd9; --paper-line:#3a3226;
+    --bg:#14171b; --bg2:#1c2026; --bg3:#242a32; --text:#e9e4d6; --muted:#9aa0a6;
+    --brass:#d9a441; --pine:#5a8a68; --brick:#b6483c;
+    --c1:#5b8fd9; --c2:#9b6fd6; --c3:#3fae9c; --c4:#d9a441;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  body{
+    margin:0; min-height:100%; background:var(--bg); color:var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    display:flex; justify-content:center;
+  }
+  .app{ width:100%; max-width:640px; padding:20px 16px 40px; }
+  .top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  h1{
+    font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+    font-weight:600; font-size:1.5rem; letter-spacing:.2px; margin:4px 0 2px;
+  }
+  .sub{ color:var(--muted); font-size:.85rem; margin-bottom:16px; }
+  #soundBtn{
+    background:var(--bg2); border:1px solid #2c3138; color:var(--muted);
+    border-radius:10px; width:40px; height:40px; font-size:1.1rem; cursor:pointer;
+  }
+  .level-row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .level-badge{
+    background:var(--brass); color:#241a08; font-family:Georgia,serif; font-weight:700;
+    border-radius:8px; padding:4px 10px; font-size:.85rem; white-space:nowrap;
+  }
+  .level-bar{ flex:1; height:8px; background:var(--bg2); border-radius:6px; overflow:hidden; }
+  .level-fill{ height:100%; background:var(--brass); width:0%; transition:width .4s ease; }
+  .stats{ display:flex; gap:14px; margin-bottom:16px; }
+  .stat{ background:var(--bg2); border-radius:10px; padding:10px 14px; flex:1; text-align:center; position:relative; }
+  .stat b{ display:block; font-size:1.4rem; font-family:Georgia, serif; }
+  .stat span{ font-size:.72rem; color:var(--muted); }
+  .stat.pulse{ animation: pop .35s ease; }
+  @keyframes pop{ 0%{transform:scale(1);} 40%{transform:scale(1.12);} 100%{transform:scale(1);} }
+
+  .clef-row{ display:flex; gap:8px; margin-bottom:12px; }
+  .clef-row .chip{ flex:1; text-align:center; }
+  .drill-status{
+    display:none; align-items:center; justify-content:space-between;
+    background:var(--bg2); border-radius:10px; padding:10px 14px; margin-bottom:12px;
+    font-family: Georgia, serif; font-size:.95rem;
+  }
+  .drill-status.on{ display:flex; }
+  .drill-status .time{ color:var(--brass); font-weight:700; font-size:1.15rem; }
+  .drill-status .tally{ color:var(--muted); font-size:.85rem; }
+  .drill-overlay{
+    display:none; position:fixed; inset:0; background:rgba(10,12,15,.88);
+    align-items:center; justify-content:center; z-index:60; padding:24px;
+  }
+  .drill-overlay.on{ display:flex; }
+  .drill-card{
+    background:var(--bg2); border-radius:16px; padding:28px 24px; max-width:360px; width:100%;
+    text-align:center; box-shadow:0 12px 32px rgba(0,0,0,.5);
+  }
+  .drill-card h2{ font-family:Georgia,serif; margin:0 0 6px; font-size:1.3rem; }
+  .drill-card .big{ font-size:2.4rem; font-family:Georgia,serif; color:var(--brass); margin:10px 0 2px; }
+  .drill-card .sub2{ color:var(--muted); font-size:.85rem; margin-bottom:20px; }
+  .drill-card .row2{ display:flex; gap:10px; margin-bottom:22px; }
+  .drill-card .row2 .box{ flex:1; background:var(--bg); border-radius:10px; padding:10px 6px; }
+  .drill-card .row2 .box b{ display:block; font-size:1.3rem; font-family:Georgia,serif; }
+  .drill-card .row2 .box span{ font-size:.7rem; color:var(--muted); }
+  .drill-card .actions{ display:flex; gap:10px; }
+  .drill-card button{
+    flex:1; padding:12px 6px; border-radius:10px; border:none; font-size:.92rem; cursor:pointer;
+    font-family:Georgia,serif;
+  }
+  .drill-card .again{ background:var(--brass); color:#241a08; }
+  .drill-card .practice{ background:var(--bg3); color:var(--text); border:1px solid #333a42; }
+
+  .staff-card{
+    background:var(--paper); border-radius:14px; padding:18px 8px 26px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); position:relative; overflow:hidden;
+  }
+  .staff-card.shake{ animation: shake .35s; }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+  svg{ display:block; width:100%; height:auto; }
+  .direction-tag{ text-align:center; color:#5c5342; font-size:.78rem; margin-top:2px; font-style:italic; }
+
+  .answers{
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(78px,1fr));
+    gap:10px; margin-top:18px;
+  }
+  .answers button{
+    background:var(--bg2); color:var(--text); border:1px solid #2c3138; border-left:4px solid var(--grp,#444);
+    border-radius:10px; padding:14px 4px; font-size:1.02rem; cursor:pointer; min-height:52px;
+    font-family: Georgia, serif; transition: transform .08s ease, background .15s;
+  }
+  .answers button:active{ transform:scale(0.94); }
+  .answers button:hover{ border-color:var(--brass); }
+  .answers button.correct{ background:var(--pine); border-color:var(--pine); color:#0d1a11; }
+  .answers button.wrong{ background:var(--brick); border-color:var(--brick); color:#20090a; }
+  .answers button:disabled{ cursor:default; opacity:.75; }
+  .feedback{ min-height:1.4rem; text-align:center; margin-top:12px; font-size:.92rem; color:var(--muted); }
+  .feedback.good{ color:var(--pine); }
+  .feedback.bad{ color:var(--brick); }
+
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-top:22px; }
+  .toolbar button{
+    background:none; border:1px solid #333a42; color:var(--muted); border-radius:8px;
+    padding:9px 14px; font-size:.85rem; cursor:pointer;
+  }
+  .toolbar button:hover{ color:var(--text); border-color:var(--brass); }
+
+  .settings{ margin-top:14px; background:var(--bg2); border-radius:10px; padding:14px; display:none; }
+  .settings.open{ display:block; }
+  .settings h2{ font-size:.85rem; margin:0 0 10px; color:var(--muted); font-weight:600; }
+  .group{ margin-bottom:12px; }
+  .group-label{ font-size:.72rem; color:var(--muted); margin-bottom:6px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{
+    font-size:.85rem; padding:8px 12px; border-radius:20px; border:1px solid #2c3138;
+    cursor:pointer; user-select:none; color:var(--muted); min-height:36px;
+  }
+  .chip.on{ background:var(--brass); border-color:var(--brass); color:#241a08; }
+
+  .burst{ position:fixed; pointer-events:none; z-index:50; }
+  .spark{ position:absolute; width:7px; height:7px; border-radius:50%; opacity:0; animation: fly .7s ease-out forwards; }
+  @keyframes fly{
+    0%{ opacity:1; transform: translate(0,0) scale(1); }
+    100%{ opacity:0; transform: translate(var(--dx), var(--dy)) scale(.3); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div>
+      <h1>Interval Sight-Reader</h1>
+      <div class="sub">Name the interval between the two notes on the staff.</div>
+    </div>
+    <button id="soundBtn" aria-label="Toggle sound">🔊</button>
+  </div>
+
+  <div class="level-row">
+    <div class="level-badge" id="levelBadge">Lv. 1</div>
+    <div class="level-bar"><div class="level-fill" id="levelFill"></div></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat" id="scoreStat"><b id="score">0</b><span>Score</span></div>
+    <div class="stat" id="streakStat"><b id="streak">0</b><span>Streak</span></div>
+    <div class="stat"><b id="best">0</b><span>Best streak</span></div>
+  </div>
+
+  <div class="clef-row" id="clefRow"></div>
+  <div class="clef-row" id="layoutRow"></div>
+  <div class="clef-row" id="drillRow"></div>
+  <div class="drill-status" id="drillStatus"></div>
+
+  <div class="staff-card" id="staffCard">
+    <svg id="staff" viewBox="0 0 380 280"></svg>
+    <div class="direction-tag" id="dirTag"></div>
+  </div>
+
+  <div class="answers" id="answers"></div>
+  <div class="feedback" id="feedback">&nbsp;</div>
+
+  <div class="toolbar">
+    <button id="settingsBtn">Intervals ▾</button>
+    <button id="skipBtn">Skip →</button>
+  </div>
+
+  <div class="settings" id="settings">
+    <h2>Choose which intervals appear</h2>
+    <div class="group"><div class="group-label">Seconds &amp; thirds</div>
+      <div class="chips" data-group="basic1"></div></div>
+    <div class="group"><div class="group-label">Fourths &amp; fifths</div>
+      <div class="chips" data-group="basic2"></div></div>
+    <div class="group"><div class="group-label">Sixths, sevenths &amp; octave</div>
+      <div class="chips" data-group="basic3"></div></div>
+    <div class="group"><div class="group-label">Compound (over the octave)</div>
+      <div class="chips" data-group="compound"></div></div>
+  </div>
+</div>
+
+<div class="drill-overlay" id="drillOverlay">
+  <div class="drill-card">
+    <h2>Time's up!</h2>
+    <div class="big" id="drillFinalScore">0</div>
+    <div class="sub2">correct answers</div>
+    <div class="row2">
+      <div class="box"><b id="drillFinalCorrect">0</b><span>Correct</span></div>
+      <div class="box"><b id="drillFinalWrong">0</b><span>Missed</span></div>
+      <div class="box"><b id="drillFinalAcc">0%</b><span>Accuracy</span></div>
+    </div>
+    <div class="actions">
+      <button class="practice" id="drillBackBtn">Practice mode</button>
+      <button class="again" id="drillAgainBtn">Go again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LETTERS = ['C','D','E','F','G','A','B'];
+const NATURAL_SEMI = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const GROUP_COLOR = {basic1:'var(--c1)', basic2:'var(--c2)', basic3:'var(--c3)', compound:'var(--c4)'};
+
+function diaIndex(letterIdx, octave){ return octave*7 + letterIdx; }
+const IDX_E4 = diaIndex(2,4);
+const IDX_G2 = diaIndex(4,2);
+
+const CLEFS = {
+  treble: { key:'treble', ref: IDX_E4, glyph:'\u{1D11E}', glyphSize:72, glyphPos:4, glyphDy:16, basicOct:[4,5], compOct:[3,4], label:'Treble' },
+  bass:   { key:'bass',   ref: IDX_G2, glyph:'\u{1D122}', glyphSize:50, glyphPos:6, glyphDy:38, basicOct:[2,3], compOct:[1,2], label:'Bass' }
+};
+
+const INTERVALS = [
+  {id:'m2', label:'m2',  steps:1, semi:1,  group:'basic1', on:true},
+  {id:'M2', label:'M2',  steps:1, semi:2,  group:'basic1', on:true},
+  {id:'m3', label:'m3',  steps:2, semi:3,  group:'basic1', on:true},
+  {id:'M3', label:'M3',  steps:2, semi:4,  group:'basic1', on:true},
+  {id:'P4', label:'P4',  steps:3, semi:5,  group:'basic2', on:true},
+  {id:'d5', label:'d5',  steps:4, semi:6,  group:'basic2', on:false},
+  {id:'P5', label:'P5',  steps:4, semi:7,  group:'basic2', on:true},
+  {id:'m6', label:'m6',  steps:5, semi:8,  group:'basic3', on:true},
+  {id:'M6', label:'M6',  steps:5, semi:9,  group:'basic3', on:true},
+  {id:'m7', label:'m7',  steps:6, semi:10, group:'basic3', on:true},
+  {id:'M7', label:'M7',  steps:6, semi:11, group:'basic3', on:true},
+  {id:'P8', label:'P8',  steps:7, semi:12, group:'basic3', on:true},
+  {id:'M9', label:'9th', steps:8, semi:14, group:'compound', on:false},
+  {id:'M10',label:'10th',steps:9, semi:16, group:'compound', on:false},
+  {id:'P11',label:'11th',steps:10,semi:17, group:'compound', on:false},
+  {id:'P12',label:'12th',steps:11,semi:19, group:'compound', on:false},
+];
+
+let clefMode = 'mixed'; // 'treble' | 'bass' | 'mixed'
+let layoutMode = 'separate'; // 'separate' | 'stacked'
+let score=0, streak=0, best=0, current=null, soundOn=true;
+try{ best = parseInt(localStorage.getItem('interval_best')||'0',10)||0; }catch(e){}
+try{ if(localStorage.getItem('interval_sound')==='off') soundOn=false; }catch(e){}
+
+function level(){ return Math.floor(score/100)+1; }
+function levelProgress(){ return score%100; }
+
+function staffPos(letterIdx, octave, ref){ return diaIndex(letterIdx, octave) - ref; }
+
+function pickInterval(){
+  const pool = INTERVALS.filter(i=>i.on);
+  if(pool.length===0) return null;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function pickClef(){
+  if(clefMode==='mixed') return Math.random()<0.5 ? CLEFS.treble : CLEFS.bass;
+  return CLEFS[clefMode];
+}
+
+function generate(interval, clef){
+  const compound = interval.steps > 7;
+  const octRange = compound ? clef.compOct : clef.basicOct;
+  for(let tries=0; tries<40; tries++){
+    const startLetter = Math.floor(Math.random()*7);
+    const startOctave = octRange[0] + Math.floor(Math.random()*(octRange.length>1?2:1));
+    const direction = compound ? 1 : (Math.random()<0.5?1:-1);
+    const startDia = diaIndex(startLetter, startOctave);
+    const startMidi = startOctave*12 + NATURAL_SEMI[LETTERS[startLetter]];
+
+    const secondDia = startDia + direction*interval.steps;
+    const secondLetter = ((secondDia%7)+7)%7;
+    const secondOctave = Math.floor(secondDia/7);
+    const secondNaturalMidi = secondOctave*12 + NATURAL_SEMI[LETTERS[secondLetter]];
+    const targetMidi = startMidi + direction*interval.semi;
+    const accidental = targetMidi - secondNaturalMidi;
+
+    const p1 = staffPos(startLetter, startOctave, clef.ref);
+    const p2 = staffPos(secondLetter, secondOctave, clef.ref);
+    if(Math.abs(accidental) <= 1 && p1 >= -8 && p1 <= 20 && p2 >= -8 && p2 <= 20){
+      return {
+        note1:{letter:startLetter, octave:startOctave, accidental:0, pos:p1},
+        note2:{letter:secondLetter, octave:secondOctave, accidental, pos:p2},
+        direction, interval, clef
+      };
+    }
+  }
+  return null;
+}
+
+function ledgerPositions(p){
+  const res=[];
+  if(p<=-2){
+    const end = p%2===0 ? p : p+1;
+    for(let lp=-2; lp>=end; lp-=2) res.push(lp);
+  } else if(p>=10){
+    const end = p%2===0 ? p : p-1;
+    for(let lp=10; lp<=end; lp+=2) res.push(lp);
+  }
+  return res;
+}
+
+const STEP=6, LINE_Y0=180, CX1=150, CX2=250, CX_STACK=205;
+const STEM_LEN=34;
+function noteY(pos){ return LINE_Y0 - pos*STEP; }
+
+function noteHead(cx, y){
+  return '<ellipse cx="'+cx+'" cy="'+y+'" rx="8" ry="6" fill="var(--paper-line)" transform="rotate(-20 '+cx+' '+y+')"/>';
+}
+function ledgerSVG(cx, pos){
+  let s='';
+  ledgerPositions(pos).forEach(function(lp){
+    const ly = noteY(lp);
+    s += '<line x1="'+(cx-11)+'" y1="'+ly+'" x2="'+(cx+11)+'" y2="'+ly+'" stroke="var(--paper-line)" stroke-width="1.4"/>';
+  });
+  return s;
+}
+function ledgerSVGPair(lower, cxLower, upper, cxUpper){
+  const positions = new Set(ledgerPositions(lower.pos).concat(ledgerPositions(upper.pos)));
+  let s='';
+  positions.forEach(function(p){
+    const above = p > 0;
+    const xs = [];
+    if(above){
+      if(lower.pos >= p) xs.push(cxLower);
+      if(upper.pos >= p) xs.push(cxUpper);
+    } else {
+      if(lower.pos <= p) xs.push(cxLower);
+      if(upper.pos <= p) xs.push(cxUpper);
+    }
+    if(xs.length===0) return;
+    const minX = Math.min.apply(null, xs) - 11;
+    const maxX = Math.max.apply(null, xs) + 11;
+    const ly = noteY(p);
+    s += '<line x1="'+minX+'" y1="'+ly+'" x2="'+maxX+'" y2="'+ly+'" stroke="var(--paper-line)" stroke-width="1.4"/>';
+  });
+  return s;
+}
+function accidentalSVG(cx, y, acc){
+  if(acc===0) return '';
+  const sym = acc>0 ? '\u266F' : '\u266D';
+  return '<text x="'+(cx-32)+'" y="'+(y+7)+'" font-size="22" font-family="Georgia, serif" fill="var(--paper-line)">'+sym+'</text>';
+}
+
+function drawStaff(q){
+  const svg = document.getElementById('staff');
+  let s = '';
+  for(let i=0;i<5;i++){
+    const y = noteY(i*2);
+    s += '<line x1="30" y1="'+y+'" x2="360" y2="'+y+'" stroke="var(--paper-line)" stroke-width="1.4"/>';
+  }
+  const c = q.clef;
+  s += '<text x="34" y="'+(noteY(c.glyphPos)+c.glyphDy)+'" font-size="'+c.glyphSize+'" font-family="Georgia, serif" fill="var(--paper-line)">'+c.glyph+'</text>';
+
+  if(layoutMode==='stacked'){
+    const n1=q.note1, n2=q.note2;
+    const y1=noteY(n1.pos), y2=noteY(n2.pos);
+    const upperIsN1 = n1.pos >= n2.pos;
+    const upper = upperIsN1?n1:n2, lower = upperIsN1?n2:n1;
+    const upperY = upperIsN1?y1:y2, lowerY = upperIsN1?y2:y1;
+    const isSecond = Math.abs(n1.pos-n2.pos)===1;
+    const midPos = (n1.pos+n2.pos)/2;
+    const stemUp = midPos < 4;
+    let upperDx=0, lowerDx=0;
+    if(isSecond){ upperDx = 18; } // the lower note always sits on the stem; the higher note always shifts right, with enough gap to clear ledger lines/accidentals
+    const cxUpper = CX_STACK+upperDx, cxLower = CX_STACK+lowerDx;
+
+    s += ledgerSVGPair(lower, cxLower, upper, cxUpper);
+    s += accidentalSVG(cxLower, upperY, upper.accidental);
+    s += accidentalSVG(cxLower, lowerY, lower.accidental);
+    s += noteHead(cxUpper, upperY);
+    s += noteHead(cxLower, lowerY);
+
+    const stemX = isSecond ? (CX_STACK + 9) : (stemUp ? CX_STACK+7 : CX_STACK-7);
+    if(stemUp){ s += '<line x1="'+stemX+'" y1="'+lowerY+'" x2="'+stemX+'" y2="'+(upperY-STEM_LEN)+'" stroke="var(--paper-line)" stroke-width="1.6"/>'; }
+    else { s += '<line x1="'+stemX+'" y1="'+upperY+'" x2="'+stemX+'" y2="'+(lowerY+STEM_LEN)+'" stroke="var(--paper-line)" stroke-width="1.6"/>'; }
+  } else {
+    [ [q.note1, CX1], [q.note2, CX2] ].forEach(function(pair){
+      const n = pair[0], cx = pair[1];
+      const y = noteY(n.pos);
+      s += ledgerSVG(cx, n.pos);
+      s += accidentalSVG(cx, y, n.accidental);
+      s += noteHead(cx, y);
+      const stemUp = n.pos < 4;
+      const stemX = stemUp ? cx+7 : cx-7;
+      const stemEndY = stemUp ? y-STEM_LEN : y+STEM_LEN;
+      s += '<line x1="'+stemX+'" y1="'+y+'" x2="'+stemX+'" y2="'+stemEndY+'" stroke="var(--paper-line)" stroke-width="1.6"/>';
+    });
+  }
+
+  svg.innerHTML = s;
+  document.getElementById('dirTag').textContent = layoutMode==='stacked'
+    ? (q.clef.label + ' clef — stacked (harmonic)')
+    : (q.clef.label + ' clef — reading left to right, ') + (q.direction>0 ? 'ascending' : 'descending');
+}
+
+function renderAnswers(){
+  const wrap = document.getElementById('answers');
+  const pool = INTERVALS.filter(function(i){ return i.on; });
+  wrap.innerHTML='';
+  pool.forEach(function(iv){
+    const b = document.createElement('button');
+    b.textContent = iv.label;
+    b.dataset.id = iv.id;
+    b.style.setProperty('--grp', GROUP_COLOR[iv.group]);
+    b.onclick = function(){ answer(iv, b); };
+    wrap.appendChild(b);
+  });
+}
+
+function next(){
+  document.getElementById('feedback').textContent = '\u00A0';
+  document.getElementById('feedback').className = 'feedback';
+  const interval = pickInterval();
+  if(!interval){
+    document.getElementById('feedback').textContent = 'Turn on at least one interval below.';
+    return;
+  }
+  const clef = pickClef();
+  const q = generate(interval, clef);
+  if(!q){ next(); return; }
+  current = q;
+  drawStaff(q);
+  renderAnswers();
+  Array.from(document.querySelectorAll('.answers button')).forEach(function(b){ b.disabled=false; });
+}
+
+/* ---- audio ---- */
+let actx = null;
+function ctx(){
+  if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(actx && actx.state==='suspended') actx.resume();
+  return actx;
+}
+function tone(freq, start, duration, gain, type){
+  const c = ctx(); if(!c) return;
+  const osc = c.createOscillator(); const g = c.createGain();
+  osc.type = type||'sine'; osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, start);
+  g.gain.linearRampToValueAtTime(gain, start+0.012);
+  g.gain.exponentialRampToValueAtTime(0.001, start+duration);
+  osc.connect(g); g.connect(c.destination);
+  osc.start(start); osc.stop(start+duration+0.03);
+}
+function playCorrect(){
+  if(!soundOn) return;
+  const c = ctx(); if(!c) return;
+  const now = c.currentTime;
+  tone(880, now, 0.09, 0.11);
+  tone(1318.5, now+0.09, 0.14, 0.13);
+}
+function playWrong(){
+  if(!soundOn) return;
+  const c = ctx(); if(!c) return;
+  const now = c.currentTime;
+  tone(196, now, 0.22, 0.14, 'sawtooth');
+}
+function playLevelUp(){
+  if(!soundOn) return;
+  const c = ctx(); if(!c) return;
+  const now = c.currentTime;
+  [523.25,659.25,783.99,1046.5].forEach(function(f,i){ tone(f, now+i*0.08, 0.16, 0.1); });
+}
+
+/* ---- gamify fx ---- */
+function pulse(el){ el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+function shakeCard(){ const el=document.getElementById('staffCard'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function burst(x,y,color){
+  const wrap = document.createElement('div');
+  wrap.className='burst'; wrap.style.left=x+'px'; wrap.style.top=y+'px';
+  for(let i=0;i<14;i++){
+    const s = document.createElement('div');
+    s.className='spark';
+    const ang = Math.random()*Math.PI*2, dist = 40+Math.random()*50;
+    s.style.setProperty('--dx', Math.cos(ang)*dist+'px');
+    s.style.setProperty('--dy', Math.sin(ang)*dist+'px');
+    s.style.background = color;
+    wrap.appendChild(s);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(function(){ wrap.remove(); }, 750);
+}
+
+function updateLevelBar(prevLevel){
+  document.getElementById('levelBadge').textContent = 'Lv. ' + level();
+  document.getElementById('levelFill').style.width = levelProgress()+'%';
+  if(level() > prevLevel){
+    playLevelUp();
+    pulse(document.getElementById('levelBadge'));
+  }
+}
+
+function answer(iv, btn){
+  if(!current) return;
+  const correct = iv.id === current.interval.id;
+  const prevLevel = level();
+  Array.from(document.querySelectorAll('.answers button')).forEach(function(b){ b.disabled=true; });
+  const fb = document.getElementById('feedback');
+  if(correct){
+    score += 10 + Math.min(streak,10);
+    streak += 1;
+    if(streak>best){ best=streak; try{localStorage.setItem('interval_best', String(best));}catch(e){} }
+    btn.classList.add('correct');
+    fb.textContent = 'Correct — ' + current.interval.label;
+    fb.className = 'feedback good';
+    playCorrect();
+    pulse(document.getElementById('scoreStat'));
+    pulse(document.getElementById('streakStat'));
+    if(streak>0 && streak%5===0){
+      const r = btn.getBoundingClientRect();
+      burst(r.left+r.width/2, r.top, 'var(--brass)');
+    }
+    if(drillActive) drillCorrect++;
+  } else {
+    streak = 0;
+    btn.classList.add('wrong');
+    const rightBtn = document.querySelector('.answers button[data-id="'+current.interval.id+'"]');
+    if(rightBtn) rightBtn.classList.add('correct');
+    fb.textContent = 'That was ' + current.interval.label;
+    fb.className = 'feedback bad';
+    playWrong();
+    shakeCard();
+    if(drillActive) drillWrong++;
+  }
+  document.getElementById('score').textContent = score;
+  document.getElementById('streak').textContent = streak;
+  document.getElementById('best').textContent = best;
+  updateLevelBar(prevLevel);
+  if(drillActive) updateDrillStatus();
+  setTimeout(function(){ if(drillActive || drillDuration===0) next(); }, drillActive ? (correct?350:650) : (correct?700:1300));
+}
+
+/* ---- speed drill ---- */
+let drillDuration = 0, drillActive = false, drillTimer = null, drillTimeLeft = 0, drillCorrect = 0, drillWrong = 0;
+
+function updateDrillStatus(){
+  const el = document.getElementById('drillStatus');
+  if(!drillActive){ el.classList.remove('on'); return; }
+  el.classList.add('on');
+  const m = Math.floor(drillTimeLeft/60), s = drillTimeLeft%60;
+  el.innerHTML = '<span class="time">'+m+':'+(s<10?'0':'')+s+'</span>'+
+    '<span class="tally">'+drillCorrect+' correct · '+drillWrong+' missed</span>';
+}
+
+function startDrill(seconds){
+  if(drillTimer) clearInterval(drillTimer);
+  drillDuration = seconds;
+  drillActive = true;
+  drillTimeLeft = seconds;
+  drillCorrect = 0; drillWrong = 0;
+  document.getElementById('drillOverlay').classList.remove('on');
+  updateDrillStatus();
+  next();
+  drillTimer = setInterval(function(){
+    drillTimeLeft -= 1;
+    updateDrillStatus();
+    if(drillTimeLeft<=0) endDrill();
+  }, 1000);
+}
+
+function endDrill(){
+  if(drillTimer){ clearInterval(drillTimer); drillTimer=null; }
+  drillActive = false;
+  updateDrillStatus();
+  const total = drillCorrect+drillWrong;
+  const acc = total>0 ? Math.round(100*drillCorrect/total) : 0;
+  document.getElementById('drillFinalScore').textContent = drillCorrect;
+  document.getElementById('drillFinalCorrect').textContent = drillCorrect;
+  document.getElementById('drillFinalWrong').textContent = drillWrong;
+  document.getElementById('drillFinalAcc').textContent = acc+'%';
+  document.getElementById('drillOverlay').classList.add('on');
+  playLevelUp();
+}
+
+function backToPractice(){
+  if(drillTimer){ clearInterval(drillTimer); drillTimer=null; }
+  drillActive = false;
+  drillDuration = 0;
+  document.getElementById('drillOverlay').classList.remove('on');
+  updateDrillStatus();
+  Array.from(document.querySelectorAll('#drillRow .chip')).forEach(function(c){ c.classList.remove('on'); });
+  document.getElementById('drillRow').firstChild.classList.add('on');
+  next();
+}
+
+function buildDrillRow(){
+  const wrap = document.getElementById('drillRow');
+  const opts = [[0,'Practice'],[30,'30s'],[60,'60s'],[120,'120s']];
+  opts.forEach(function(pair){
+    const secs = pair[0], label = pair[1];
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (secs===0?' on':'');
+    chip.textContent = label;
+    chip.onclick = function(){
+      Array.from(wrap.children).forEach(function(c){ c.classList.remove('on'); });
+      chip.classList.add('on');
+      if(secs===0){ backToPractice(); } else { startDrill(secs); }
+    };
+    wrap.appendChild(chip);
+  });
+}
+document.getElementById('drillBackBtn').onclick = backToPractice;
+document.getElementById('drillAgainBtn').onclick = function(){ startDrill(drillDuration); };
+
+function buildSettings(){
+  const groups = {basic1:[], basic2:[], basic3:[], compound:[]};
+  INTERVALS.forEach(function(iv){ groups[iv.group].push(iv); });
+  Object.keys(groups).forEach(function(g){
+    const el = document.querySelector('.chips[data-group="'+g+'"]');
+    groups[g].forEach(function(iv){
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (iv.on?' on':'');
+      chip.textContent = iv.label;
+      chip.onclick = function(){
+        iv.on = !iv.on;
+        chip.classList.toggle('on', iv.on);
+      };
+      el.appendChild(chip);
+    });
+  });
+}
+
+function buildClefRow(){
+  const wrap = document.getElementById('clefRow');
+  const opts = [['treble','Treble'],['bass','Bass'],['mixed','Mixed']];
+  opts.forEach(function(pair){
+    const key = pair[0], label = pair[1];
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (clefMode===key?' on':'');
+    chip.textContent = label;
+    chip.onclick = function(){
+      clefMode = key;
+      Array.from(wrap.children).forEach(function(c){ c.classList.remove('on'); });
+      chip.classList.add('on');
+      next();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+document.getElementById('settingsBtn').onclick = function(){
+  document.getElementById('settings').classList.toggle('open');
+};
+document.getElementById('skipBtn').onclick = next;
+document.getElementById('soundBtn').onclick = function(){
+  soundOn = !soundOn;
+  document.getElementById('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+  try{ localStorage.setItem('interval_sound', soundOn?'on':'off'); }catch(e){}
+};
+document.getElementById('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+
+function buildLayoutRow(){
+  const wrap = document.getElementById('layoutRow');
+  const opts = [['separate','Separate'],['stacked','Stacked']];
+  opts.forEach(function(pair){
+    const key = pair[0], label = pair[1];
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (layoutMode===key?' on':'');
+    chip.textContent = label;
+    chip.onclick = function(){
+      layoutMode = key;
+      Array.from(wrap.children).forEach(function(c){ c.classList.remove('on'); });
+      chip.classList.add('on');
+      next();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+buildSettings();
+buildClefRow();
+buildLayoutRow();
+buildDrillRow();
+document.getElementById('best').textContent = best;
+document.getElementById('levelBadge').textContent = 'Lv. ' + level();
+next();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('service-worker.js').catch(function(){ /* offline support just won't be available */ });
+  });
+}
+</script>
+</body>
+</html>
